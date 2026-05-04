@@ -10,36 +10,37 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import type { WeeklyKpi } from "../data/hartwell";
+import type { WeeklyKpi, DataSource } from "../data/hartwell";
+import { WidgetHeader } from "./WidgetHeader";
 
 type Props = {
-  history: WeeklyKpi[];
+  history: { weekOf: string; otd: number }[];
   target: number;
   q2Mandate: number;
+  source?: DataSource;
+  filterLabel?: string | null;
   onPointClick?: (week: WeeklyKpi) => void;
+  rawHistory?: WeeklyKpi[];
 };
 
-export function OtdTrend({ history, target, q2Mandate, onPointClick }: Props) {
-  const data = history.map((w) => ({
+export function OtdTrend({ history, target, q2Mandate, source, filterLabel, onPointClick, rawHistory }: Props) {
+  const data = history.map((w, i) => ({
     week: w.weekOf.slice(5),
     weekFull: w.weekOf,
     otd: w.otd,
-    raw: w,
+    raw: rawHistory?.[i],
   }));
 
   return (
     <div className="bg-white border border-zinc-200 rounded-lg p-5">
-      <div className="flex items-baseline justify-between mb-1 gap-3 flex-wrap">
-        <h3 className="text-sm font-semibold text-zinc-900">
-          On-Time Delivery
-        </h3>
-        <p className="text-xs text-zinc-500">
-          Target {target}% · Q2 mandate {q2Mandate}%
-        </p>
-      </div>
+      <WidgetHeader
+        title="On-Time Delivery"
+        subtitle={`Target ${target}% · Q2 mandate ${q2Mandate}% · ${history.length} weeks`}
+        source={source}
+        filterLabel={filterLabel}
+      />
       <p className="text-xs text-zinc-500 mb-4">
-        {history.length} weeks shown. Click a data point to drill into the loads
-        that missed the window that week.
+        Click a point to drill into the week&apos;s misses.
       </p>
       <div style={{ width: "100%", height: 220 }}>
         <ResponsiveContainer>
@@ -93,8 +94,7 @@ export function OtdTrend({ history, target, q2Mandate, onPointClick }: Props) {
                 fill: "#0891b2",
                 style: { cursor: "pointer" },
                 onClick: (_e, payload) => {
-                  // Recharts passes the dot's payload via "payload" on activeDot
-                  const p = payload as unknown as { payload?: { raw: WeeklyKpi } };
+                  const p = payload as unknown as { payload?: { raw?: WeeklyKpi } };
                   if (onPointClick && p.payload?.raw) onPointClick(p.payload.raw);
                 },
               }}

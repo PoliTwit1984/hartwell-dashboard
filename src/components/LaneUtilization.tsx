@@ -10,9 +10,16 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import type { Lane } from "../data/hartwell";
+import type { Lane, DataSource } from "../data/hartwell";
+import { WidgetHeader } from "./WidgetHeader";
 
-export function LaneUtilization({ lanes }: { lanes: Lane[] }) {
+type Props = {
+  lanes: Lane[];
+  source?: DataSource;
+  filterLabel?: string | null;
+};
+
+export function LaneUtilization({ lanes, source, filterLabel }: Props) {
   const live = lanes.filter((l) => l.status === "live").sort((a, b) => b.utilizationPct - a.utilizationPct);
   const newLanes = lanes.filter((l) => l.status === "new");
 
@@ -20,14 +27,20 @@ export function LaneUtilization({ lanes }: { lanes: Lane[] }) {
 
   return (
     <div className="bg-white border border-zinc-200 rounded-lg p-5">
-      <div className="flex items-baseline justify-between mb-1">
-        <h3 className="text-sm font-semibold text-zinc-900">Lane Utilization</h3>
-        <p className="text-xs text-zinc-500">Loaded miles ÷ total miles · all live corridors</p>
-      </div>
+      <WidgetHeader
+        title="Lane Utilization"
+        subtitle="Loaded miles ÷ total miles · live corridors"
+        source={source}
+        filterLabel={filterLabel}
+      />
       <p className="text-xs text-zinc-500 mb-4">
-        Lanes below 75% for two consecutive weeks get flagged for review. CIN-PHX
-        currently the lowest at 68%.
+        Lanes below 75% for two consecutive weeks get flagged for review.
       </p>
+      {live.length === 0 && (
+        <p className="text-sm italic text-zinc-500 py-6 text-center">
+          No live lanes serve this customer.
+        </p>
+      )}
       <div style={{ width: "100%", height: 240 }}>
         <ResponsiveContainer>
           <BarChart data={data} margin={{ top: 5, right: 16, left: -8, bottom: 0 }}>

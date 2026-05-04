@@ -1,6 +1,7 @@
 "use client";
 
-import type { CapexItem } from "../data/hartwell";
+import type { CapexItem, DataSource } from "../data/hartwell";
+import { WidgetHeader } from "./WidgetHeader";
 
 const statusMeta: Record<CapexItem["status"], { label: string; bg: string; text: string }> = {
   "pending-approval": { label: "Pending", bg: "bg-amber-50", text: "text-amber-700" },
@@ -17,18 +18,27 @@ export function formatUsd(amount: number): string {
 type Props = {
   items: CapexItem[];
   onSelectItem?: (item: CapexItem) => void;
+  source?: DataSource;
+  filterLabel?: string | null;
 };
 
-export function CapexBoard({ items, onSelectItem }: Props) {
+export function CapexBoard({ items, onSelectItem, source, filterLabel }: Props) {
   return (
     <div className="bg-white border border-zinc-200 rounded-lg p-5">
-      <div className="flex items-baseline justify-between mb-1">
-        <h3 className="text-sm font-semibold text-zinc-900">Capex Pending</h3>
-        <p className="text-xs text-zinc-500">{items.filter((i) => i.status === "pending-approval").length} awaiting sign-off</p>
-      </div>
+      <WidgetHeader
+        title="Capex Pending"
+        subtitle={`${items.filter((i) => i.status === "pending-approval").length} awaiting sign-off`}
+        source={source}
+        filterLabel={filterLabel}
+      />
       <p className="text-xs text-zinc-500 mb-4">
-        Items needing your approval. Click an item for the full sponsor + payback breakdown.
+        Click an item for the full sponsor + payback breakdown.
       </p>
+      {items.length === 0 && (
+        <p className="text-sm italic text-zinc-500 py-6 text-center">
+          No capex items tied to this customer.
+        </p>
+      )}
       <div className="space-y-3">
         {items.map((item) => {
           const m = statusMeta[item.status];

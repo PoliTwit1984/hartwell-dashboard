@@ -8,9 +8,10 @@ type Props = {
   good?: boolean;
   anomaly?: boolean;
   onClick?: () => void;
+  filterContext?: string | null;
 };
 
-export function KpiCard({ label, value, comparison, trend, good, anomaly, onClick }: Props) {
+export function KpiCard({ label, value, comparison, trend, good, anomaly, onClick, filterContext }: Props) {
   const trendColor =
     good === undefined
       ? "text-zinc-500"
@@ -34,9 +35,16 @@ export function KpiCard({ label, value, comparison, trend, good, anomaly, onClic
       className={`${baseClass} ${stateClass} ${interactiveClass} w-full block`}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs uppercase tracking-wider text-zinc-500 font-medium">
-          {label}
-        </p>
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wider text-zinc-500 font-medium">
+            {label}
+          </p>
+          {filterContext && (
+            <p className="text-[10px] text-cyan-700 font-medium mt-0.5 truncate">
+              {filterContext}
+            </p>
+          )}
+        </div>
         {anomaly && (
           <span className="text-[10px] uppercase tracking-wider font-semibold text-red-700 bg-red-50 px-1.5 py-0.5 rounded shrink-0">
             Anomaly

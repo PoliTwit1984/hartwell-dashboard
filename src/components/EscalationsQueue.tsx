@@ -1,7 +1,8 @@
 "use client";
 
-import type { Escalation } from "../data/hartwell";
+import type { Escalation, DataSource } from "../data/hartwell";
 import { StickyNote } from "./StickyNote";
+import { WidgetHeader } from "./WidgetHeader";
 
 const sevMeta: Record<Escalation["severity"], { label: string; bg: string; text: string }> = {
   low: { label: "Low", bg: "bg-zinc-100", text: "text-zinc-700" },
@@ -15,13 +16,21 @@ const statusMeta: Record<Escalation["status"], { label: string; dot: string }> =
   resolved: { label: "Resolved", dot: "bg-emerald-500" },
 };
 
-export function EscalationsQueue({ escalations }: { escalations: Escalation[] }) {
+type Props = {
+  escalations: Escalation[];
+  source?: DataSource;
+  filterLabel?: string | null;
+};
+
+export function EscalationsQueue({ escalations, source, filterLabel }: Props) {
   return (
     <div className="bg-white border border-zinc-200 rounded-lg p-5">
-      <div className="flex items-baseline justify-between mb-1">
-        <h3 className="text-sm font-semibold text-zinc-900">Customer Escalations</h3>
-        <p className="text-xs text-zinc-500">{escalations.length} active</p>
-      </div>
+      <WidgetHeader
+        title="Customer Escalations"
+        subtitle={`${escalations.length} active`}
+        source={source}
+        filterLabel={filterLabel}
+      />
       <p className="text-xs text-zinc-500 mb-4">
         Owned by Priya Iyengar (Customer Solutions) and Tony Marchetti (Sales). Notes you add are stored locally.
       </p>

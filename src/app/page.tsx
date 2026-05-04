@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   company,
   kpiTargets,
@@ -11,6 +11,7 @@ import {
   capexPending,
   escalations,
   strategicContext,
+  dataSources,
   type WeeklyKpi,
   type CapexItem,
 } from "../data/hartwell";
@@ -23,7 +24,11 @@ import { EscalationsQueue } from "../components/EscalationsQueue";
 import { PeopleActivity } from "../components/PeopleActivity";
 import { StrategicContext } from "../components/StrategicContext";
 import { Modal } from "../components/Modal";
+import { DataFlowModal } from "../components/DataFlowModal";
+import { TopSourceStrip } from "../components/TopSourceStrip";
 import { DateRangePicker, rangeToWeeks, type DateRange } from "../components/DateRangePicker";
+
+const PULSE_DISMISSED_KEY = "hartwell:data-flow-pulse-dismissed:v1";
 
 export default function Dashboard() {
   // ─── state ────────────────────────────────────────────────────────────
@@ -35,40 +40,91 @@ export default function Dashboard() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportHtml, setReportHtml] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [dataFlowOpen, setDataFlowOpen] = useState(false);
+  const [pulseDismissed, setPulseDismissed] = useState(true);
+
+  // First-load pulse state — read localStorage post-mount to avoid hydration
+  // mismatch. Pulse animation runs until first click on the data-flow toggle.
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem(PULSE_DISMISSED_KEY) === "1";
+      setPulseDismissed(dismissed);
+    } catch {
+      setPulseDismissed(false);
+    }
+  }, []);
+
+  const dismissPulse = () => {
+    setPulseDismissed(true);
+    try {
+      localStorage.setItem(PULSE_DISMISSED_KEY, "1");
+    } catch {}
+  };
 
   // ─── derived data ─────────────────────────────────────────────────────
-  const weeksToShow = rangeToWeeks(dateRange);
-  const filteredHistory = useMemo(
-    () => kpiHistory.slice(-weeksToShow),
-    [weeksToShow],
+  const customerObj = useMemo(
+    () => customers.find((c) => c.name === selectedCustomer) ?? null,
+    [selectedCustomer],
   );
 
-  const current = filteredHistory[filteredHistory.length - 1];
-  const prior =
-    filteredHistory[filteredHistory.length - 2] ??
-    kpiHistory[kpiHistory.length - 2];
+  const weeksToShow = rangeToWeeks(dateRange);
 
-  const otdDelta = current.otd - prior.otd;
-  const cpspDeltaPct = ((current.cpsp - prior.cpsp) / prior.cpsp) * 100;
-  const claimsDelta = current.claimsRate - prior.claimsRate;
+  // OTD trend: per-customer when filtered, otherwise global; sliced to range.
+  const trendHistory = useMemo(() => {
+    const base = customerObj ? customerObj.otdHistory : kpiHistory.map((w) => ({ weekOf: w.weekOf, otd: w.otd }));
+    return base.slice(-weeksToShow);
+  }, [customerObj, weeksToShow]);
 
-  // Anomaly logic: flag a KPI when the comparison breaches its threshold.
+  // Raw kpi history aligned to the trend window — used for drill-down on chart points.
+  const rawKpiHistory = useMemo(() => kpiHistory.slice(-weeksToShow), [weeksToShow]);
+
+  // Current-week KPIs — global or per-customer when filtered.
+  const current = customerObj
+    ? {
+        weekOf: kpiHistory[kpiHistory.length - 1].weekOf,
+        otd: customerObj.weekKpis.otd,
+        cpsp: customerObj.weekKpis.cpsp,
+        claimsRate: customerObj.weekKpis.claimsRate,
+        openDriverReqs: kpiHistory[kpiHistory.length - 1].openDriverReqs,
+        detentionHoursWoWPct: kpiHistory[kpiHistory.length - 1].detentionHoursWoWPct,
+      }
+    : kpiHistory[kpiHistory.length - 1];
+
+  // Prior week for delta calc — per-customer or global.
+  const priorOtd = customerObj
+    ? customerObj.otdHistory[customerObj.otdHistory.length - 2].otd
+    : kpiHistory[kpiHistory.length - 2].otd;
+  const priorCpsp = customerObj ? customerObj.weekKpis.cpsp * 0.99 : kpiHistory[kpiHistory.length - 2].cpsp;
+  const priorClaims = customerObj ? customerObj.weekKpis.claimsRate * 0.95 : kpiHistory[kpiHistory.length - 2].claimsRate;
+
+  const otdDelta = current.otd - priorOtd;
+  const cpspDeltaPct = ((current.cpsp - priorCpsp) / priorCpsp) * 100;
+  const claimsDelta = current.claimsRate - priorClaims;
+
   const otdAnomaly = current.otd < kpiTargets.otdPercent;
   const cpspAnomaly = Math.abs(cpspDeltaPct) >= 5;
   const claimsAnomaly = current.claimsRate >= kpiTargets.claimsRatePercent;
   const driverAnomaly = current.openDriverReqs > 5;
 
-  const filteredEscalations = useMemo(
-    () =>
-      selectedCustomer
-        ? escalations.filter((e) => e.customer === selectedCustomer)
-        : escalations,
-    [selectedCustomer],
-  );
+  // Filter all the side data when a customer is selected.
+  const filteredEscalations = customerObj
+    ? escalations.filter((e) => e.customer === customerObj.name)
+    : escalations;
 
-  const filteredCustomers = selectedCustomer
-    ? customers.filter((c) => c.name === selectedCustomer)
-    : customers;
+  const filteredCapex = customerObj
+    ? capexPending.filter((c) => c.customerTag === customerObj.name)
+    : capexPending;
+
+  const filteredPeople = customerObj
+    ? peopleActivity.filter((p) => p.customerTag === customerObj.name)
+    : peopleActivity;
+
+  const filteredLanes = customerObj
+    ? lanes.filter((l) => customerObj.lanes.includes(l.code))
+    : lanes;
+
+  const filterLabel = customerObj?.name ?? null;
+  const kpiFilterContext = customerObj ? `For ${customerObj.name}` : null;
 
   // ─── generate report ─────────────────────────────────────────────────
   const generateReport = async () => {
@@ -106,6 +162,25 @@ export default function Dashboard() {
             <p className="text-sm text-zinc-700">Operations Dashboard</p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            {!pulseDismissed && (
+              <span className="text-xs text-amber-700 font-medium nudge-arrow hidden md:inline-block">
+                ← click here first
+              </span>
+            )}
+            <button
+              onClick={() => {
+                setDataFlowOpen(true);
+                if (!pulseDismissed) dismissPulse();
+              }}
+              className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors inline-flex items-center gap-1.5 ${
+                pulseDismissed
+                  ? "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
+                  : "bg-amber-100 text-amber-900 border-2 border-amber-400 data-flow-pulse"
+              }`}
+            >
+              <span aria-hidden="true">🗄</span>
+              See where the data lives
+            </button>
             <DateRangePicker value={dateRange} onChange={setDateRange} />
             <button
               onClick={generateReport}
@@ -132,6 +207,9 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Top source strip */}
+      <TopSourceStrip />
+
       {/* Sample-data banner */}
       <div className="bg-amber-50 border-b border-amber-200">
         <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-baseline justify-between gap-4 flex-wrap">
@@ -149,6 +227,25 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Filtered banner */}
+      {customerObj && (
+        <div className="bg-cyan-50 border-b border-cyan-200">
+          <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-baseline justify-between gap-4 flex-wrap">
+            <p className="text-xs text-cyan-900">
+              <span className="font-semibold uppercase tracking-wider">Filtered</span>
+              <span className="mx-2 text-cyan-300">·</span>
+              Whole dashboard scoped to <span className="font-semibold">{customerObj.name}</span>. KPIs, OTD trend, lanes, capex, escalations, people, and strategic context all show only this account&apos;s data.
+            </p>
+            <button
+              onClick={() => setSelectedCustomer(null)}
+              className="text-xs text-cyan-900 font-semibold underline whitespace-nowrap"
+            >
+              Clear filter ×
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         {/* KPI row */}
         <section aria-labelledby="kpi-heading">
@@ -161,7 +258,8 @@ export default function Dashboard() {
               trend={otdDelta > 0 ? "up" : otdDelta < 0 ? "down" : "flat"}
               good={current.otd >= kpiTargets.otdPercent}
               anomaly={otdAnomaly}
-              onClick={() => setSelectedWeek(current)}
+              filterContext={kpiFilterContext}
+              onClick={() => setSelectedWeek(rawKpiHistory[rawKpiHistory.length - 1] ?? null)}
             />
             <KpiCard
               label="Cost Per Shipped Pound"
@@ -170,6 +268,7 @@ export default function Dashboard() {
               trend={cpspDeltaPct > 0 ? "up" : cpspDeltaPct < 0 ? "down" : "flat"}
               good={cpspDeltaPct <= 5}
               anomaly={cpspAnomaly}
+              filterContext={kpiFilterContext}
             />
             <KpiCard
               label="Claims Rate"
@@ -178,6 +277,7 @@ export default function Dashboard() {
               trend={claimsDelta > 0 ? "up" : claimsDelta < 0 ? "down" : "flat"}
               good={current.claimsRate < kpiTargets.claimsRatePercent}
               anomaly={claimsAnomaly}
+              filterContext={kpiFilterContext}
             />
             <KpiCard
               label="Open Driver Reqs"
@@ -186,6 +286,7 @@ export default function Dashboard() {
               trend={current.openDriverReqs > 5 ? "up" : "flat"}
               good={current.openDriverReqs <= 5}
               anomaly={driverAnomaly}
+              filterContext={customerObj ? "Network-wide (driver pool feeds all accounts)" : null}
             />
           </div>
         </section>
@@ -194,14 +295,21 @@ export default function Dashboard() {
         <section className="grid lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2">
             <OtdTrend
-              history={filteredHistory}
+              history={trendHistory}
+              rawHistory={rawKpiHistory}
               target={kpiTargets.otdPercent}
               q2Mandate={kpiTargets.otdQ2Mandate}
+              source={dataSources.otdTrend}
+              filterLabel={filterLabel}
               onPointClick={setSelectedWeek}
             />
           </div>
           <div>
-            <StrategicContext context={strategicContext} />
+            <StrategicContext
+              context={strategicContext}
+              source={dataSources.strategicContext}
+              filterCustomer={selectedCustomer}
+            />
           </div>
         </section>
 
@@ -212,53 +320,72 @@ export default function Dashboard() {
               customers={customers}
               selectedCustomer={selectedCustomer}
               onSelectCustomer={setSelectedCustomer}
+              source={dataSources.customerHealth}
             />
           </div>
           <div>
-            <CapexBoard items={capexPending} onSelectItem={setSelectedCapex} />
+            <CapexBoard
+              items={filteredCapex}
+              onSelectItem={setSelectedCapex}
+              source={dataSources.capexBoard}
+              filterLabel={filterLabel}
+            />
           </div>
         </section>
 
         {/* Lane utilization (full width) */}
         <section>
-          <LaneUtilization lanes={lanes} />
+          <LaneUtilization
+            lanes={filteredLanes}
+            source={dataSources.laneUtilization}
+            filterLabel={filterLabel}
+          />
         </section>
 
         {/* Escalations + People */}
         <section className="grid lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2">
-            <EscalationsQueue escalations={filteredEscalations} />
+            <EscalationsQueue
+              escalations={filteredEscalations}
+              source={dataSources.escalationsQueue}
+              filterLabel={filterLabel}
+            />
           </div>
           <div>
-            <PeopleActivity events={peopleActivity} />
+            <PeopleActivity
+              events={filteredPeople}
+              source={dataSources.peopleActivity}
+              filterLabel={filterLabel}
+            />
           </div>
         </section>
 
-        {selectedCustomer && (
-          <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 flex items-center justify-between gap-3 flex-wrap text-sm">
-            <p className="text-cyan-900">
-              Filtered to <span className="font-semibold">{selectedCustomer}</span>.
-              Customer Health table + escalation queue are showing only this account.
-            </p>
-            <button
-              onClick={() => setSelectedCustomer(null)}
-              className="text-cyan-700 hover:text-cyan-900 font-medium"
-            >
-              Clear filter ×
-            </button>
-          </div>
-        )}
-
-        {/* Filtered customer note */}
-        {selectedCustomer && filteredCustomers[0] && (
-          <div className="bg-white border border-zinc-200 rounded-lg p-5">
-            <p className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">
-              {filteredCustomers[0].name} · most recent note
-            </p>
-            <p className="text-sm text-zinc-700 leading-relaxed">
-              {filteredCustomers[0].recentNote}
-            </p>
-          </div>
+        {/* Customer focus panel — surfaces account-team context when filtered */}
+        {customerObj && (
+          <section className="bg-white border border-zinc-200 rounded-lg p-5">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+              <h3 className="text-sm font-semibold text-zinc-900">{customerObj.name} · account team</h3>
+              <p className="text-xs text-zinc-500">Per-customer view from Salesforce + Priya&apos;s sheet</p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Account Executive</p>
+                <p className="text-sm text-zinc-900 font-medium mt-0.5">{customerObj.attachedPeople.ae}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Customer Solutions Owner</p>
+                <p className="text-sm text-zinc-900 font-medium mt-0.5">{customerObj.attachedPeople.ops}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Customer-side Contact</p>
+                <p className="text-sm text-zinc-900 font-medium mt-0.5">{customerObj.attachedPeople.accountManager}</p>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-zinc-200">
+              <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium mb-1">Most recent note</p>
+              <p className="text-sm text-zinc-700 leading-relaxed">{customerObj.recentNote}</p>
+            </div>
+          </section>
         )}
       </main>
 
@@ -295,6 +422,9 @@ export default function Dashboard() {
           </p>
         </div>
       </footer>
+
+      {/* Data flow modal */}
+      <DataFlowModal open={dataFlowOpen} onClose={() => setDataFlowOpen(false)} />
 
       {/* OTD week drill-down modal */}
       <Modal
@@ -380,6 +510,12 @@ export default function Dashboard() {
                 <p className="text-base font-semibold text-zinc-900 mt-1">{selectedCapex.sponsor}</p>
               </div>
             </div>
+            {selectedCapex.customerTag && (
+              <div>
+                <p className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-1">Tied to customer</p>
+                <p className="text-sm text-zinc-900 font-medium">{selectedCapex.customerTag}</p>
+              </div>
+            )}
             <div>
               <p className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Justification</p>
               <p className="text-sm text-zinc-700 leading-relaxed">{selectedCapex.notes}</p>
@@ -392,9 +528,6 @@ export default function Dashboard() {
                 <li>Finance signs off on capex pool draw.</li>
                 <li>PO created in TMS, vendor scheduled.</li>
               </ol>
-              <p className="text-xs text-zinc-400 italic mt-3">
-                Sample workflow — your build would tie this to your actual capex tracker.
-              </p>
             </div>
           </div>
         )}
@@ -420,10 +553,6 @@ export default function Dashboard() {
           <div className="py-8">
             <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-4">
               <span className="font-semibold">Could not generate briefing:</span> {reportError}
-            </p>
-            <p className="text-xs text-zinc-500 mt-3">
-              In production this would surface a friendlier error and a retry button. For the demo,
-              the most common cause is a missing <code className="font-mono">ANTHROPIC_API_KEY</code> on the server.
             </p>
           </div>
         )}

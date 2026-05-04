@@ -1,6 +1,7 @@
 "use client";
 
-import type { Customer } from "../data/hartwell";
+import type { Customer, DataSource } from "../data/hartwell";
+import { WidgetHeader } from "./WidgetHeader";
 
 const healthMeta: Record<Customer["health"], { label: string; bg: string; text: string; dot: string }> = {
   healthy: { label: "Healthy", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
@@ -12,25 +13,25 @@ type Props = {
   customers: Customer[];
   selectedCustomer: string | null;
   onSelectCustomer: (name: string | null) => void;
+  source?: DataSource;
 };
 
-export function CustomerHealth({ customers, selectedCustomer, onSelectCustomer }: Props) {
+export function CustomerHealth({ customers, selectedCustomer, onSelectCustomer, source }: Props) {
   return (
     <div className="bg-white border border-zinc-200 rounded-lg p-5">
-      <div className="flex items-baseline justify-between mb-1 gap-3 flex-wrap">
-        <h3 className="text-sm font-semibold text-zinc-900">Customer Health</h3>
-        <div className="flex items-center gap-3">
-          <p className="text-xs text-zinc-500">Top 5 accounts · % of revenue</p>
-          {selectedCustomer && (
-            <button
-              onClick={() => onSelectCustomer(null)}
-              className="text-xs font-medium text-cyan-700 hover:text-cyan-900 transition-colors"
-            >
-              Clear filter ×
-            </button>
-          )}
-        </div>
-      </div>
+      <WidgetHeader
+        title="Customer Health"
+        subtitle="Top 5 accounts · % of revenue"
+        source={source}
+        rightSlot={selectedCustomer ? (
+          <button
+            onClick={() => onSelectCustomer(null)}
+            className="text-xs font-medium text-cyan-700 hover:text-cyan-900 transition-colors"
+          >
+            Clear filter ×
+          </button>
+        ) : null}
+      />
       <p className="text-xs text-zinc-500 mb-4">
         Click an account to filter the rest of the dashboard. Status reflects last 4 weeks of volume, on-time delivery, and Priya&apos;s escalation queue.
       </p>
