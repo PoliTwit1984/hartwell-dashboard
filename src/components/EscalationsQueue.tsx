@@ -1,4 +1,7 @@
+"use client";
+
 import type { Escalation } from "../data/hartwell";
+import { StickyNote } from "./StickyNote";
 
 const sevMeta: Record<Escalation["severity"], { label: string; bg: string; text: string }> = {
   low: { label: "Low", bg: "bg-zinc-100", text: "text-zinc-700" },
@@ -20,8 +23,13 @@ export function EscalationsQueue({ escalations }: { escalations: Escalation[] })
         <p className="text-xs text-zinc-500">{escalations.length} active</p>
       </div>
       <p className="text-xs text-zinc-500 mb-4">
-        Owned by Priya Iyengar (Customer Solutions) and Tony Marchetti (Sales).
+        Owned by Priya Iyengar (Customer Solutions) and Tony Marchetti (Sales). Notes you add are stored locally.
       </p>
+      {escalations.length === 0 && (
+        <p className="text-sm italic text-zinc-500 py-6 text-center">
+          No active escalations matching the current filter.
+        </p>
+      )}
       <div className="space-y-3">
         {escalations.map((e) => {
           const sev = sevMeta[e.severity];
@@ -49,6 +57,10 @@ export function EscalationsQueue({ escalations }: { escalations: Escalation[] })
               <p className="text-xs text-zinc-500 mt-2">
                 Owner: {e.owner} · Opened {e.opened.slice(5)}
               </p>
+              <StickyNote
+                storageKey={`hartwell:escalation-note:${e.customer}:${e.opened}`}
+                placeholder={`Note for ${e.customer} escalation`}
+              />
             </div>
           );
         })}

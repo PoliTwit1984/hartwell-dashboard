@@ -16,27 +16,30 @@ type Props = {
   history: WeeklyKpi[];
   target: number;
   q2Mandate: number;
+  onPointClick?: (week: WeeklyKpi) => void;
 };
 
-export function OtdTrend({ history, target, q2Mandate }: Props) {
+export function OtdTrend({ history, target, q2Mandate, onPointClick }: Props) {
   const data = history.map((w) => ({
     week: w.weekOf.slice(5),
+    weekFull: w.weekOf,
     otd: w.otd,
+    raw: w,
   }));
 
   return (
     <div className="bg-white border border-zinc-200 rounded-lg p-5">
-      <div className="flex items-baseline justify-between mb-1">
+      <div className="flex items-baseline justify-between mb-1 gap-3 flex-wrap">
         <h3 className="text-sm font-semibold text-zinc-900">
-          On-Time Delivery — 12 weeks
+          On-Time Delivery
         </h3>
         <p className="text-xs text-zinc-500">
           Target {target}% · Q2 mandate {q2Mandate}%
         </p>
       </div>
       <p className="text-xs text-zinc-500 mb-4">
-        Q1 2026 averaged 92.1% (under target). Q2 mandate from COO is sustained
-        above 94%. Currently at 94.0% week-over-week, holding.
+        {history.length} weeks shown. Click a data point to drill into the loads
+        that missed the window that week.
       </p>
       <div style={{ width: "100%", height: 220 }}>
         <ResponsiveContainer>
@@ -82,8 +85,19 @@ export function OtdTrend({ history, target, q2Mandate }: Props) {
               dataKey="otd"
               stroke="#0891b2"
               strokeWidth={2.5}
-              dot={{ r: 3, strokeWidth: 0, fill: "#0891b2" }}
-              activeDot={{ r: 5 }}
+              dot={{ r: 4, strokeWidth: 0, fill: "#0891b2" }}
+              activeDot={{
+                r: 7,
+                strokeWidth: 2,
+                stroke: "#fff",
+                fill: "#0891b2",
+                style: { cursor: "pointer" },
+                onClick: (_e, payload) => {
+                  // Recharts passes the dot's payload via "payload" on activeDot
+                  const p = payload as unknown as { payload?: { raw: WeeklyKpi } };
+                  if (onPointClick && p.payload?.raw) onPointClick(p.payload.raw);
+                },
+              }}
             />
           </LineChart>
         </ResponsiveContainer>
