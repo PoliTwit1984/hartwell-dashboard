@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hartwell Dashboard
 
-## Getting Started
+**AI Builders Club Sprint 01 — Advanced capstone example**
 
-First, run the development server:
+An operations dashboard for "Hartwell Industries," a fictional mid-market manufacturing company. Built to demonstrate the upper end of what a non-engineer can ship in a 4-week AIBC sprint: real data viz, real interactions, agentic patterns, and a production deploy.
+
+## What's in here
+
+- **Live ops dashboard** with KPI cards, trend charts, and a real-time alert feed
+- **AI insights panel** — Claude summarizes anomalies in the data and recommends actions
+- **Drill-down views** for each KPI, with cohort and segment slicing
+- **Mock data generator** so the dashboard runs end-to-end without a live backend
+
+## Stack
+
+- **Next.js 16** (App Router) + **TypeScript** + **Tailwind v4**
+- **Anthropic SDK** for the insights agent
+- **Recharts** for visualization
+- **Vercel** for deploy
+
+## Run locally
 
 ```bash
+git clone https://github.com/joewilsonai/hartwell-dashboard
+cd hartwell-dashboard
+npm install
+cp .env.example .env.local   # add ANTHROPIC_API_KEY
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Why it exists
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+AI Builders Club Sprint 01 — *"Build a real AI product in 4 weeks."* Most capstones we showcase are the achievable middle (Priya RAG, BuildScope). Hartwell is the **stretch goal** — what's possible if you push hard, learn fast, and ship loud.
 
-## Learn More
+Built by [Joe Wilson](https://github.com/joewilsonai) for [AI Builders Club](https://aibuildersclub.ai).
 
-To learn more about Next.js, take a look at the following resources:
+## License
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
